@@ -70,6 +70,8 @@ export const HelloWorldEditor = ({ config, onChange, hass }: EditorProps<Config>
 
 defineCard({
     key: 'hello-world-card-react',
+    name: 'Hello World',
+    description: 'Example card showing entity values.',
     schema: configSchema,
     entities: (config) => config.entities,
     Component: HelloWorld,

@@ -123,7 +123,27 @@ export function defineCard(card: CardDefinition<GenericSchema> | Card<unknown>):
         }
     }
 
+    // getCardSize — tells HA how tall the card is (in grid rows)
+    if (card.cardSize != null) {
+        const size = card.cardSize;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- HA duck-typing
+        (CardClass.prototype as any).getCardSize = () => size;
+    }
+
     customElements.define(card.key, CardClass);
+
+    // Register with HA card picker (window.customCards)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- HA global registration
+    const customCards = ((window as any).customCards ??= []) as Array<{
+        type: string;
+        name: string;
+        description?: string;
+    }>;
+    customCards.push({
+        type: card.key,
+        name: card.name,
+        description: card.description,
+    });
 
     // -----------------------------------------------------------------------
     // Editor element (only if Editor component is provided)

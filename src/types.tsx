@@ -26,16 +26,22 @@ export type EditorProps<TConfig> = {
 /** Schema-based card definition — config type is inferred from the schema. */
 export type CardDefinition<TSchema extends GenericSchema> = {
     key: string;
+    name: string;
+    description?: string;
     schema: TSchema;
     entities: (config: InferOutput<TSchema>) => string[];
     Component: ComponentType<InferOutput<TSchema>>;
     Editor?: ComponentType<EditorProps<InferOutput<TSchema>>>;
     getStubConfig?: (hass: HassObject) => InferOutput<TSchema>;
+    cardSize?: number;
 };
 
 /** Legacy card definition — config type is provided manually. No schema validation or editor. */
 export type Card<TConfig> = {
     key: string;
+    name: string;
+    description?: string;
     entities: (config: TConfig) => string[];
     Component: ComponentType<TConfig>;
+    cardSize?: number;
 };
