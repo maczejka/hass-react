@@ -1,52 +1,196 @@
 import ReactDOM from 'react-dom/client';
 import { StyleSheetManager } from 'styled-components';
+import { GenericSchema, InferOutput, safeParse } from 'valibot';
 
-import { createHassStore } from './state';
-import { Card, HassObject } from './types';
+import { CardErrorBoundary } from './error-boundary';
+import { createEntityStore, EntityStoreContext } from './store';
+import { Card, CardDefinition, EditorProps, HassObject } from './types';
 
-export * from './state';
+export { useEntity, useMockedEntityValue } from './store';
+export type { EntityStore } from './store';
 export * from './types';
 
-export const defineCard = <TConfig,>(card: Card<TConfig>) => {
-    const { Container, registerEntityListener } = createHassStore();
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function hasSchema<TSchema extends GenericSchema>(
+    card: CardDefinition<TSchema> | Card<unknown>,
+): card is CardDefinition<TSchema> {
+    return 'schema' in card && card.schema !== undefined;
+}
+
+function mountRoot(host: HTMLElement) {
+    const styleSlot = document.createElement('section');
+    const renderIn = document.createElement('div');
+    styleSlot.appendChild(renderIn);
+    host.appendChild(styleSlot);
+    return { styleSlot, root: ReactDOM.createRoot(renderIn) };
+}
+
+// ---------------------------------------------------------------------------
+// defineCard
+// ---------------------------------------------------------------------------
+
+export function defineCard<TSchema extends GenericSchema>(card: CardDefinition<TSchema>): void;
+export function defineCard<TConfig>(card: Card<TConfig>): void;
+export function defineCard(card: CardDefinition<GenericSchema> | Card<unknown>): void {
+    type TConfig = typeof card extends CardDefinition<infer S> ? InferOutput<S> : unknown;
+
+    const schema = hasSchema(card) ? card.schema : undefined;
+    const EditorComponent = hasSchema(card) ? card.Editor : undefined;
+    const getStubConfig = hasSchema(card) ? card.getStubConfig : undefined;
+
+    // -----------------------------------------------------------------------
+    // Card element
+    // -----------------------------------------------------------------------
 
     class CardClass extends HTMLElement {
-        config: TConfig | undefined = undefined;
+        private _config: TConfig | undefined;
+        private _entities: string[] | undefined;
+        private _root: ReactDOM.Root | null = null;
+        private _styleSlot: HTMLElement | null = null;
+        private _store = createEntityStore();
+        private _mounted = false;
 
-        content: ReactDOM.Root | null = null;
-        styleSlot: HTMLElement | null = null;
+        static getConfigElement() {
+            if (EditorComponent) {
+                return document.createElement(`${card.key}-editor`);
+            }
+            return undefined;
+        }
 
-        entities: string[] | undefined = undefined;
+        static getStubConfig(hass: HassObject) {
+            if (getStubConfig) {
+                return getStubConfig(hass);
+            }
+            return undefined;
+        }
 
-        setConfig(config: TConfig) {
-            this.config = config;
-            this.entities = card.entities(config);
-            this.entities.forEach(registerEntityListener);
+        setConfig(config: unknown) {
+            if (schema) {
+                const result = safeParse(schema, config);
+                if (result.success) {
+                    this._config = result.output as TConfig;
+                } else {
+                    console.warn(`[hass-react] Invalid config for "${card.key}":`, result.issues);
+                    this._config = config as TConfig;
+                }
+            } else {
+                this._config = config as TConfig;
+            }
+            this._entities = card.entities(this._config as never);
+            if (this._mounted) {
+                this._render();
+            }
         }
 
         set hass(hass: HassObject) {
-            // done once
-            if (!this.content) {
-                this.styleSlot = document.createElement('section');
-                const renderIn = document.createElement('div');
-                this.styleSlot.appendChild(renderIn);
-                this.appendChild(this.styleSlot);
-                this.content = ReactDOM.createRoot(renderIn);
+            if (!this._root) {
+                const { styleSlot, root } = mountRoot(this);
+                this._styleSlot = styleSlot;
+                this._root = root;
             }
-            // done repeatedly
-            if (!this.config || !this.styleSlot) {
+            if (!this._config || !this._styleSlot) {
                 return;
             }
+            this._store.update(hass, this._entities);
+            if (!this._mounted) {
+                this._mounted = true;
+                this._render();
+            }
+        }
 
-            this.content.render(
-                <StyleSheetManager target={this.styleSlot}>
-                    <Container hass={hass} entities={this.entities}>
-                        <card.Component {...this.config} />
-                    </Container>
+        disconnectedCallback() {
+            this._root?.unmount();
+            this._root = null;
+            this._mounted = false;
+        }
+
+        private _render() {
+            if (!this._root || !this._config || !this._styleSlot) {
+                return;
+            }
+            this._root.render(
+                <StyleSheetManager target={this._styleSlot}>
+                    <EntityStoreContext.Provider value={this._store}>
+                        <CardErrorBoundary cardKey={card.key}>
+                            <card.Component {...(this._config as Record<string, unknown>)} />
+                        </CardErrorBoundary>
+                    </EntityStoreContext.Provider>
                 </StyleSheetManager>,
             );
         }
     }
 
     customElements.define(card.key, CardClass);
-};
+
+    // -----------------------------------------------------------------------
+    // Editor element (only if Editor component is provided)
+    // -----------------------------------------------------------------------
+
+    if (EditorComponent) {
+        const Editor = EditorComponent as React.ComponentType<EditorProps<TConfig>>;
+
+        class EditorClass extends HTMLElement {
+            private _config: TConfig | undefined;
+            private _hass: HassObject | undefined;
+            private _root: ReactDOM.Root | null = null;
+            private _styleSlot: HTMLElement | null = null;
+
+            setConfig(config: unknown) {
+                if (schema) {
+                    const result = safeParse(schema, config);
+                    this._config = (result.success ? result.output : config) as TConfig;
+                } else {
+                    this._config = config as TConfig;
+                }
+                this._render();
+            }
+
+            set hass(hass: HassObject) {
+                this._hass = hass;
+                this._render();
+            }
+
+            disconnectedCallback() {
+                this._root?.unmount();
+                this._root = null;
+            }
+
+            private _handleChange = (newConfig: TConfig) => {
+                this.dispatchEvent(
+                    new CustomEvent('config-changed', {
+                        bubbles: true,
+                        composed: true,
+                        detail: { config: newConfig },
+                    }),
+                );
+            };
+
+            private _render() {
+                if (!this._root) {
+                    const { styleSlot, root } = mountRoot(this);
+                    this._styleSlot = styleSlot;
+                    this._root = root;
+                }
+                if (!this._config || !this._hass || !this._styleSlot) {
+                    return;
+                }
+                this._root.render(
+                    <StyleSheetManager target={this._styleSlot}>
+                        <CardErrorBoundary cardKey={`${card.key}-editor`}>
+                            <Editor
+                                config={this._config}
+                                onChange={this._handleChange}
+                                hass={this._hass}
+                            />
+                        </CardErrorBoundary>
+                    </StyleSheetManager>,
+                );
+            }
+        }
+
+        customElements.define(`${card.key}-editor`, EditorClass);
+    }
+}

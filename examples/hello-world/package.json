@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "main": "src/index.tsx",
   "dependencies": {
-    "@maczejka/hass-react": "*"
+    "@maczejka/hass-react": "*",
+    "valibot": "^1.2.0"
   }
 }
