@@ -1,7 +1,7 @@
 import { defineCard, EditorProps, useEntity } from '@maczejka/hass-react';
 import * as v from 'valibot';
 
-const configSchema = v.object({
+export const configSchema = v.object({
     entities: v.array(v.string()),
 });
 
@@ -27,7 +27,7 @@ export const HelloWorld = ({ entities }: Config) => {
     );
 };
 
-const HelloWorldEditor = ({ config, onChange, hass }: EditorProps<Config>) => {
+export const HelloWorldEditor = ({ config, onChange, hass }: EditorProps<Config>) => {
     const availableEntities = Object.keys(hass.states);
 
     const addEntity = (entityId: string) => {
