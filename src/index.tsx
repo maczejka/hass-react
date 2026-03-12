@@ -6,8 +6,8 @@ import { CardErrorBoundary } from './error-boundary';
 import { createEntityStore, EntityStoreContext } from './store';
 import { Card, CardDefinition, EditorProps, HassObject } from './types';
 
-export { useEntity, useMockedEntityValue } from './store';
-export type { EntityStore } from './store';
+export { createEntityHook, useEntity, useMockedEntityValue } from './store';
+export type { EntityResult, EntityStore } from './store';
 export * from './types';
 
 // ---------------------------------------------------------------------------

@@ -1,12 +1,38 @@
-import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from 'react';
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useSyncExternalStore,
+} from 'react';
+
+import { GenericSchema, InferOutput, safeParse } from 'valibot';
 
 import { HassObject } from './types';
 
 type Listener = () => void;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- HA entity state values are dynamic
-type EntityValue = any;
-type EntityState = Record<string, EntityValue>;
+type EntityState = Record<string, string | undefined>;
+
+// ---------------------------------------------------------------------------
+// EntityResult — rich return type for useEntity
+// ---------------------------------------------------------------------------
+
+export type EntityResult<T = unknown> = {
+    /** Parsed/validated value. `undefined` when the entity is unavailable or fails validation. */
+    value: T | undefined;
+    /** Raw state string from Home Assistant. `undefined` when the entity is missing entirely. */
+    rawValue: string | undefined;
+    /** Entity exists in Home Assistant and its state is not `unavailable` or `unknown`. */
+    isAvailable: boolean;
+    /** Value conforms to the provided schema. Always `true` when no schema is given. */
+    isValid: boolean;
+};
+
+// ---------------------------------------------------------------------------
+// Entity store
+// ---------------------------------------------------------------------------
 
 export function createEntityStore() {
     let state: EntityState = {};
@@ -32,7 +58,7 @@ export function createEntityStore() {
             let changed = false;
             const next: EntityState = {};
             for (const id of entities ?? []) {
-                const value = hass.states[id]?.state ?? 'unavailable';
+                const value = hass.states[id]?.state;
                 if (state[id] !== value) {
                     changed = true;
                 }
@@ -52,20 +78,89 @@ export type EntityStore = ReturnType<typeof createEntityStore>;
 const fallbackStore = createEntityStore();
 export const EntityStoreContext = createContext<EntityStore>(fallbackStore);
 
-export function useEntity({ entityId }: { entityId: string | undefined }): EntityValue {
+// ---------------------------------------------------------------------------
+// useEntity
+// ---------------------------------------------------------------------------
+
+/** With a schema — value type is inferred from the schema output. */
+export function useEntity<TSchema extends GenericSchema>(options: {
+    entityId: string | undefined;
+    schema: TSchema;
+    validate?: boolean;
+}): EntityResult<InferOutput<TSchema>>;
+
+/** Without a schema — value is the raw state string. */
+export function useEntity(options: { entityId: string | undefined }): EntityResult<string>;
+
+export function useEntity({
+    entityId,
+    schema,
+    validate = true,
+}: {
+    entityId: string | undefined;
+    schema?: GenericSchema;
+    validate?: boolean;
+}): EntityResult {
     const store = useContext(EntityStoreContext);
-    return useSyncExternalStore(
+
+    const rawValue = useSyncExternalStore(
         store.subscribe,
         useCallback(
             () => (entityId ? store.getSnapshot()[entityId] : undefined),
             [store, entityId],
         ),
     );
+
+    return useMemo(() => {
+        if (entityId === undefined) {
+            return { value: undefined, rawValue: undefined, isAvailable: false, isValid: true };
+        }
+
+        const isAvailable =
+            rawValue !== undefined && rawValue !== 'unavailable' && rawValue !== 'unknown';
+
+        if (!isAvailable) {
+            return { value: undefined, rawValue, isAvailable, isValid: true };
+        }
+
+        if (schema && validate) {
+            const result = safeParse(schema, rawValue);
+            return {
+                value: result.success ? result.output : undefined,
+                rawValue,
+                isAvailable,
+                isValid: result.success,
+            };
+        }
+
+        return { value: rawValue, rawValue, isAvailable, isValid: true };
+    }, [entityId, rawValue, schema, validate]);
 }
 
-export function useMockedEntityValue(id: string, value: EntityValue) {
+// ---------------------------------------------------------------------------
+// createEntityHook — factory for schema-bound useEntity wrappers
+// ---------------------------------------------------------------------------
+
+/** Creates a typed `useEntity` wrapper with a baked-in schema. */
+export function createEntityHook<TSchema extends GenericSchema>(schema: TSchema) {
+    return (options: { entityId: string | undefined; validate?: boolean }) =>
+        useEntity({ ...options, schema });
+}
+
+// ---------------------------------------------------------------------------
+// useMockedEntityValue
+// ---------------------------------------------------------------------------
+
+/**
+ * Injects a mock entity value into the store for Storybook/testing.
+ *
+ * - `string` — entity exists in HA with that state (pass `'unavailable'` or `'unknown'` to
+ *   simulate those HA states).
+ * - `null` — entity is missing from `hass.states` entirely.
+ */
+export function useMockedEntityValue(id: string, value: string | null) {
     const store = useContext(EntityStoreContext);
     useEffect(() => {
-        store.update({ states: { [id]: { state: value } } }, [id]);
+        store.update({ states: { [id]: value === null ? undefined : { state: value } } }, [id]);
     }, [store, id, value]);
 }

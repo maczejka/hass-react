@@ -1,4 +1,4 @@
-import { defineCard, EditorProps, useEntity } from '@maczejka/hass-react';
+import { createEntityHook, defineCard, EditorProps } from '@maczejka/hass-react';
 import * as v from 'valibot';
 
 export const configSchema = v.object({
@@ -7,11 +7,13 @@ export const configSchema = v.object({
 
 type Config = v.InferOutput<typeof configSchema>;
 
+const useStringEntity = createEntityHook(v.string());
+
 export const HelloWorldEntity = ({ entityId }: { entityId: string }) => {
-    const value = useEntity({ entityId });
+    const { value, isAvailable } = useStringEntity({ entityId });
     return (
         <div>
-            {entityId}:{value}
+            {entityId}: {isAvailable ? value : 'unavailable'}
         </div>
     );
 };
