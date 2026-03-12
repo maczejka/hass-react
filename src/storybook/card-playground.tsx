@@ -95,6 +95,14 @@ const s = {
         color: '#1e7e34',
         fontFamily: 'system-ui, sans-serif',
     } satisfies CSSProperties,
+    unavailableBadge: {
+        fontSize: '9px',
+        padding: '1px 5px',
+        borderRadius: '3px',
+        backgroundColor: '#fef2f2',
+        color: '#d32f2f',
+        fontFamily: 'system-ui, sans-serif',
+    } satisfies CSSProperties,
     removeButton: {
         border: 'none',
         background: 'none',
@@ -252,6 +260,7 @@ function ConfigJsonEditor({
 export function CardPlayground({ card, initialConfig, initialEntities = {} }: CardPlaygroundProps) {
     // -- Entity mocking state ------------------------------------------------
     const [entityValues, setEntityValues] = useState<Record<string, string>>(initialEntities);
+    const [unavailableEntities, setUnavailableEntities] = useState<Set<string>>(new Set());
     const [newEntityId, setNewEntityId] = useState('');
 
     // -- Config state --------------------------------------------------------
@@ -290,10 +299,15 @@ export function CardPlayground({ card, initialConfig, initialEntities = {} }: Ca
     const mockHass: HassObject = useMemo(
         () => ({
             states: Object.fromEntries(
-                allEntityIds.map((id) => [id, { state: entityValues[id] ?? '' }]),
+                allEntityIds.map((id) => [
+                    id,
+                    unavailableEntities.has(id)
+                        ? { state: 'unavailable' }
+                        : { state: entityValues[id] ?? '' },
+                ]),
             ),
         }),
-        [allEntityIds, entityValues],
+        [allEntityIds, entityValues, unavailableEntities],
     );
 
     // -- Entity store for card preview ---------------------------------------
@@ -322,6 +336,24 @@ export function CardPlayground({ card, initialConfig, initialEntities = {} }: Ca
         setEntityValues((prev) => {
             const next = { ...prev };
             delete next[id];
+            return next;
+        });
+        setUnavailableEntities((prev) => {
+            if (!prev.has(id)) return prev;
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+        });
+    }, []);
+
+    const toggleUnavailable = useCallback((id: string) => {
+        setUnavailableEntities((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
             return next;
         });
     }, []);
@@ -431,6 +463,7 @@ export function CardPlayground({ card, initialConfig, initialEntities = {} }: Ca
                     {allEntityIds.map((id) => {
                         const value = entityValues[id] ?? '';
                         const isActive = activeEntities.includes(id);
+                        const isUnavailable = unavailableEntities.has(id);
                         return (
                             <div key={id} style={s.entityRow}>
                                 <div style={s.entityHeader}>
@@ -442,6 +475,9 @@ export function CardPlayground({ card, initialConfig, initialEntities = {} }: Ca
                                     >
                                         {id}
                                         {isActive && <span style={s.activeBadge}>active</span>}
+                                        {isUnavailable && (
+                                            <span style={s.unavailableBadge}>unavailable</span>
+                                        )}
                                     </span>
                                     <button
                                         type="button"
@@ -452,12 +488,25 @@ export function CardPlayground({ card, initialConfig, initialEntities = {} }: Ca
                                         x
                                     </button>
                                 </div>
-                                <input
-                                    style={s.input}
-                                    value={value}
-                                    onChange={(e) => updateEntity(id, e.target.value)}
-                                    placeholder="entity state value"
-                                />
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    <input
+                                        style={{
+                                            ...s.input,
+                                            opacity: isUnavailable ? 0.4 : 1,
+                                        }}
+                                        value={value}
+                                        onChange={(e) => updateEntity(id, e.target.value)}
+                                        placeholder="entity state value"
+                                        disabled={isUnavailable}
+                                    />
+                                    <input
+                                        type="checkbox"
+                                        style={s.checkbox}
+                                        checked={isUnavailable}
+                                        onChange={() => toggleUnavailable(id)}
+                                        title="Toggle unavailable"
+                                    />
+                                </div>
                             </div>
                         );
                     })}
