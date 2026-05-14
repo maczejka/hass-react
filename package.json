@@ -1,6 +1,6 @@
 {
     "name": "@maczejka/hass-react",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Write Home Assistant dashboard cards with React, TypeScript, and Valibot.",
     "license": "MIT",
     "author": "maczejka",
