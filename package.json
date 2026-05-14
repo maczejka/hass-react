@@ -1,25 +1,79 @@
 {
-  "name": "@maczejka/hass-react",
-  "private": true,
-  "version": "0.1.0",
-  "main": "src/index.tsx",
-  "exports": {
-    ".": "./src/index.tsx",
-    "./storybook": "./src/storybook/index.tsx"
-  },
-  "dependencies": {
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "styled-components": "^6.3.11",
-    "valibot": "^1.2.0"
-  },
-  "devDependencies": {
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "react-rnd": "^10.5.2"
-  },
-  "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
-  }
+    "name": "@maczejka/hass-react",
+    "version": "0.1.0",
+    "description": "Write Home Assistant dashboard cards with React, TypeScript, and Valibot.",
+    "license": "MIT",
+    "author": "maczejka",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/maczejka/hass-react.git"
+    },
+    "homepage": "https://github.com/maczejka/hass-react#readme",
+    "bugs": {
+        "url": "https://github.com/maczejka/hass-react/issues"
+    },
+    "keywords": [
+        "home-assistant",
+        "hass",
+        "react",
+        "custom-card",
+        "lovelace",
+        "valibot",
+        "storybook"
+    ],
+    "type": "module",
+    "sideEffects": false,
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        },
+        "./storybook": {
+            "types": "./dist/storybook.d.ts",
+            "import": "./dist/storybook.js",
+            "require": "./dist/storybook.cjs"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "typecheck": "tsc --noEmit",
+        "prepublishOnly": "pnpm run build"
+    },
+    "peerDependencies": {
+        "react": "^18.0.0 || ^19.0.0",
+        "react-dom": "^18.0.0 || ^19.0.0",
+        "react-rnd": "^10.0.0",
+        "styled-components": "^6.0.0",
+        "valibot": "^1.0.0"
+    },
+    "peerDependenciesMeta": {
+        "react-rnd": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@types/react": "^19.2.14",
+        "@types/react-dom": "^19.2.3",
+        "react": "^19.2.4",
+        "react-dom": "^19.2.4",
+        "react-rnd": "^10.5.2",
+        "styled-components": "^6.3.11",
+        "tsup": "^8.0.0",
+        "typescript": "^5.5.0",
+        "valibot": "^1.2.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
 }
