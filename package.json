@@ -48,7 +48,15 @@
         "build": "tsup",
         "dev": "tsup --watch",
         "typecheck": "tsc --noEmit",
-        "prepublishOnly": "pnpm run build"
+        "prepublishOnly": "pnpm run build",
+        "preversion": "pnpm run typecheck && pnpm run build",
+        "postversion": "git push --follow-tags",
+        "release:patch": "pnpm version patch -m 'release: v%s'",
+        "release:minor": "pnpm version minor -m 'release: v%s'",
+        "release:major": "pnpm version major -m 'release: v%s'"
+    },
+    "engines": {
+        "node": ">=20"
     },
     "peerDependencies": {
         "react": "^18.0.0 || ^19.0.0",
