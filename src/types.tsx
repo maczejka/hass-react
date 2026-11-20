@@ -7,6 +7,13 @@ import { GenericSchema, InferOutput } from 'valibot';
 export type HassState = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- HA entity states are dynamic
     state: any;
+    entity_id?: string;
+    /** Entity attributes (unit_of_measurement, friendly_name, forecast lists, …). */
+    attributes?: Record<string, unknown>;
+    /** ISO timestamp of the last state change. */
+    last_changed?: string;
+    /** ISO timestamp of the last state or attribute change. */
+    last_updated?: string;
 };
 
 export type HassObject = {

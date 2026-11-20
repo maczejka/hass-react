@@ -88,6 +88,26 @@ React hook that reads a single Home Assistant entity state. Returns the entity's
 const value = useEntity({ entityId: 'sensor.temperature' });
 ```
 
+### `useEntityState({ entityId })`
+
+Reads the full state object of one entity — state, attributes and timestamps — for everything `useEntity` doesn't
+cover (forecast lists in attributes, units, "offline since …"). Re-renders only when that entity's state object
+changes (Home Assistant replaces it on every state or attribute change).
+
+```tsx
+const { state, attributes, lastChanged, isAvailable } = useEntityState({ entityId: 'weather.home' });
+const forecast = attributes.forecast as Array<{ datetime: string; temperature: number }> | undefined;
+return isAvailable ? <span>{state}</span> : <span>offline since {lastChanged?.toLocaleDateString()}</span>;
+```
+
+| Field | Type | |
+|---|---|---|
+| `state` | `string \| undefined` | raw state; `undefined` when the entity is missing |
+| `attributes` | `Record<string, unknown>` | `{}` when missing |
+| `lastChanged` / `lastUpdated` | `Date \| undefined` | from `last_changed` / `last_updated` |
+| `isAvailable` | `boolean` | exists and not `unavailable` / `unknown` |
+| `raw` | `HassState \| undefined` | the object as HA delivers it |
+
 ### Config editor
 
 If you provide an `Editor` component, `defineCard` automatically registers a `<key>-editor` custom element. The editor receives `EditorProps<TConfig>`:
@@ -159,6 +179,21 @@ import { useMockedEntityValue } from '@maczejka/hass-react';
 export const SimpleStory = () => {
     useMockedEntityValue('sensor.temperature', '22.5');
     return <TemperatureDisplay entityId="sensor.temperature" />;
+};
+```
+
+Several mocks in one story add up — each one only sets its own entity.
+
+### `useMockedEntityState(id, state)`
+
+The counterpart for `useEntityState`: inject a full state object (pass a constant or memoized object).
+
+```tsx
+const HORN = { state: '12', attributes: { unit_of_measurement: 'cm' }, last_changed: '2026-11-20T10:00:00Z' };
+
+export const WithAttributes = () => {
+    useMockedEntityState('sensor.snow_horn', HORN);
+    return <SnowTile entityId="sensor.snow_horn" />;
 };
 ```
 
